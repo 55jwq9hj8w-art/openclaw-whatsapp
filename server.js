@@ -25,10 +25,16 @@ app.post('/incomingMessages', twilio.webhook({ validate: false, authToken: proce
     // Add the incoming message to context
     conversationContext.push({ role: "user", content: incomingMsg });
     // Ask the brain for a reply
-     const replyMessage = "✅ Render webhook reached you";
+     let replyMessage;
+     try {
+       replyMessage = (await getAIReply(incomingMsg)).trim();
+     } catch (err) {
+       console.error("OpenAI error:", err?.message || err);
+       replyMessage = "⚠️ I hit an error talking to the AI. Try again in a moment.";
+     }
 
-    // Respond to the message
-    res.send(`<Response><Message>${replyMessage}</Message></Response>`);
+     // Respond to the message
+     res.send(`<Response><Message></Message></Response>`);
 });
 
 // Add this line for the root path
