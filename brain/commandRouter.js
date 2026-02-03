@@ -1,6 +1,6 @@
 // brain/commandRouter.js
 
-function normalize(text) {
+function normalize(text = "") {
   return (text || "")
     .toLowerCase()
     .trim()
