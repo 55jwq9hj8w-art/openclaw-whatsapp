@@ -8,7 +8,7 @@ app.set("trust proxy", true);
 
 app.use(express.urlencoded({ extended: false }));
 
-const port = 3000;
+const port = process.env.PORT || 3000;
 let conversationContext = []; // Array to store conversation context
 
 // Middleware to parse incoming requests
