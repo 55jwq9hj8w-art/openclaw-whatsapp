@@ -16,13 +16,18 @@ async function getAIReply(userId, userMessage) {
   // Load recent history
   const history = await getRecentMessages(userId, 12);
 
-  // ✅ SIMPLE QUOTE FLOW CHECK
+  // ✅ QUOTE FLOW CHECK (more flexible)
   const lastAssistant = history
     .filter((m) => m.role === "assistant")
     .slice(-1)[0]?.content?.toLowerCase();
 
-  // Step 1: If bot just asked for service, ask for quantity
-  if (lastAssistant && lastAssistant.includes("what service do you need")) {
+  // Step 1: After "quote" → user gives service → ask quantity
+  if (
+    lastAssistant &&
+    (lastAssistant.includes("quote request started") ||
+      lastAssistant.includes("what service") ||
+      lastAssistant.includes("reply with what you need"))
+  ) {
     const reply = `✅ Got it — ${userMessage}.
 
 How many units/items will you need? (Example: 4 cameras)`;
@@ -31,7 +36,7 @@ How many units/items will you need? (Example: 4 cameras)`;
     return reply;
   }
 
-  // Step 2: If bot just asked quantity, ask about installation
+  // Step 2: After quantity → ask installation
   if (lastAssistant && lastAssistant.includes("how many units")) {
     const reply = `Perfect.
 
@@ -41,7 +46,7 @@ Do you need professional installation as well? (Yes or No)`;
     return reply;
   }
 
-  // Step 3: If bot just asked installation, finish quote
+  // Step 3: After installation → finish quote
   if (lastAssistant && lastAssistant.includes("professional installation")) {
     const reply = `✅ Awesome — thank you.
 
@@ -67,4 +72,5 @@ Our team will follow up shortly with pricing and next steps.`;
 }
 
 module.exports = { getAIReply };
+
 
