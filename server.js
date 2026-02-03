@@ -16,7 +16,7 @@ const port = process.env.PORT || 3000;
 app.post(
   "/incomingMessages",
   twilio.webhook({
-    validate: false, // ✅ leave OFF until everything is stable again
+    validate: true, // ✅ leave OFF until everything is stable again
     authToken: process.env.TWILIO_AUTH_TOKEN,
   }),
   async (req, res) => {
