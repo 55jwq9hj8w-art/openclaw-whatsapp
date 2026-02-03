@@ -34,7 +34,7 @@ app.post('/incomingMessages', twilio.webhook({ validate: false, authToken: proce
      }
 
      // Respond to the message
-     res.send(`<Response><Message></Message></Response>`);
+     res.send(`<Response><Message>${replyMessage}</Message></Response>`);
 });
 
 // Add this line for the root path
