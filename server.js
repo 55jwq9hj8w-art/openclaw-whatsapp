@@ -29,7 +29,8 @@ app.post(
 
     let replyMessage;
     try {
-      replyMessage = (await getAIReply(incomingMsg)).trim();
+     replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
+
     } catch (err) {
       console.error("OpenAI error:", err?.message || err);
       replyMessage =
