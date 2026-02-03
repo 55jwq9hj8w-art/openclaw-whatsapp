@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "axios": "^1.13.4",
+    "body-parser": "^2.2.2",
+    "chromadb": "^3.2.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "langchain": "^1.2.16",
+    "openai": "^6.17.0",
+    "twilio": "^5.12.0"
+  }
+}
