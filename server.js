@@ -16,7 +16,7 @@ let conversationContext = []; // Array to store conversation context
 // app.use(bodyParser.json());
 
 // Webhook endpoint for WhatsApp messages
-app.post('/incomingMessages', twilio.webhook({ validate: false, authToken: process.env.TWILIO_AUTH_TOKEN }), async (req, res) => {
+app.post('/incomingMessages', twilio.webhook({ validate: true, authToken: process.env.TWILIO_AUTH_TOKEN }), async (req, res) => {
     const incomingMsg = req.body.Body; // Get the message content
     const fromNumber = req.body.From; // Get the sender's number
 
