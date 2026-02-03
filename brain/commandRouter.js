@@ -11,6 +11,7 @@ function normalize(text) {
 function checkCommand(message) {
   const text = normalize(message);
 
+  // ✅ Help / Menu
   if (text === "help" || text === "menu") {
     return `
 ✅ OpenClaw Assistant Help Menu
@@ -23,6 +24,23 @@ Type one of these:
 • menu      → show this menu again
 
 Or just ask me anything normally.
+    `;
+  }
+
+  // ✅ Quote Command (Starter)
+  if (text === "quote") {
+    return `
+✅ Quote Request Started
+
+Great — what service do you need a quote for?
+
+Examples:
+• Security cameras
+• Access control
+• Smart home setup
+• Monitoring
+
+Just reply with what you need.
     `;
   }
 
