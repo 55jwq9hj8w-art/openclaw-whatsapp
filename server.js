@@ -1,41 +1,41 @@
-const { getAIReply } = require("./brain/assistant");
-const { checkCommand } = require("./brain/commandRouter");
 require("dotenv").config();
 
 const express = require("express");
 const twilio = require("twilio");
 
-const app = express();
-app.set("trust proxy", true);
+const { getAIReply } = require("./brain/assistant");
+const { checkCommand } = require("./brain/commandRouter");
 
+const app = express();
 app.use(express.urlencoded({ extended: false }));
 
 const port = process.env.PORT || 3000;
 
 //
-// ✅ WORKING ROUTE (Validation OFF)
-// This is your live bot route
+// ✅ MAIN WHATSAPP ROUTE
 //
 app.post(
   "/incomingMessages",
   twilio.webhook({
     validate: false,
-    authToken: process.env.TWILIO_AUTH_TOKEN,
   }),
   async (req, res) => {
     const incomingMsg = req.body.Body || "";
     const fromNumber = req.body.From || "";
 
-    console.log(`Message from ${fromNumber}: ${incomingMsg}`);
+    let replyMessage = "";
 
-    let replyMessage;
     try {
-      // 1) Check for simple commands first (like "help")
+      // ✅ Check commands first
       const commandReply = checkCommand(incomingMsg);
+
       if (commandReply) {
         replyMessage = commandReply.trim();
       } else {
-        // 2) Otherwise use the AI (with memory)
+        // ✅ DEBUG: log what user sent
+        console.log("LAST MESSAGE:", incomingMsg);
+
+        // Otherwise use AI reply
         replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
       }
     } catch (err) {
@@ -45,26 +45,6 @@ app.post(
 
     res.type("text/xml");
     res.send(`<Response><Message>${replyMessage}</Message></Response>`);
-  }
-);
-
-//
-// ✅ SECURE TEST ROUTE (Validation ON)
-// This is ONLY for testing signature validation safely
-//
-app.post(
-  "/incomingMessagesSecure",
-  twilio.webhook({
-    validate: true,
-    authToken: process.env.TWILIO_AUTH_TOKEN,
-
-    // Required for Render/Cloudflare
-    protocol: "https",
-    host: "openclaw-whatsapp.onrender.com",
-  }),
-  async (req, res) => {
-    res.type("text/xml");
-    res.send(`<Response><Message>✅ Secure route works!</Message></Response>`);
   }
 );
 
@@ -81,3 +61,4 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
