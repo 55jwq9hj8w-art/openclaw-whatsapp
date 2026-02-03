@@ -1,48 +1,49 @@
 const { getAIReply } = require("./brain/assistant");
 require("dotenv").config();
-const express = require('express');
-// const bodyParser = require('body-parser');
-const twilio = require('twilio');
+
+const express = require("express");
+const twilio = require("twilio");
+
 const app = express();
 app.set("trust proxy", true);
 
+// Twilio sends x-www-form-urlencoded
 app.use(express.urlencoded({ extended: false }));
 
 const port = process.env.PORT || 3000;
-let conversationContext = []; // Array to store conversation context
-
-// Middleware to parse incoming requests
-// app.use(bodyParser.urlencoded({ extended: false }));
-// app.use(bodyParser.json());
 
 // Webhook endpoint for WhatsApp messages
-app.post('/incomingMessages', twilio.webhook({ validate: true, authToken: process.env.TWILIO_AUTH_TOKEN, url: 'https://openclaw-whatsapp.onrender.com/incomingMessages' }), async (req, res) => {
-    const incomingMsg = req.body.Body; // Get the message content
-    const fromNumber = req.body.From; // Get the sender's number
+app.post(
+  "/incomingMessages",
+  twilio.webhook({
+    validate: false, // ✅ leave OFF until everything is stable again
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+  }),
+  async (req, res) => {
+    const incomingMsg = req.body.Body;
+    const fromNumber = req.body.From;
 
     console.log(`Message from ${fromNumber}: ${incomingMsg}`);
-    
-    // Add the incoming message to context
-    conversationContext.push({ role: "user", content: incomingMsg });
-    // Ask the brain for a reply
-     let replyMessage;
-     try {
-       replyMessage = (await getAIReply(incomingMsg)).trim();
-     } catch (err) {
-       console.error("OpenAI error:", err?.message || err);
-       replyMessage = "⚠️ I hit an error talking to the AI. Try again in a moment.";
-     }
 
-     // Respond to the message
-     res.send(`<Response><Message>${replyMessage}</Message></Response>`);
-});
+    let replyMessage;
+    try {
+      replyMessage = (await getAIReply(incomingMsg)).trim();
+    } catch (err) {
+      console.error("OpenAI error:", err?.message || err);
+      replyMessage = "⚠️ I hit an error talking to the AI. Try again in a moment.";
+    }
 
-// Add this line for the root path
-app.get('/', (req, res) => {
-    res.send('Welcome to the WhatsApp Messaging API!');
+    res.type("text/xml");
+    res.send(`<Response><Message>${replyMessage}</Message></Response>`);
+  }
+);
+
+// Root path
+app.get("/", (req, res) => {
+  res.send("OpenClaw WhatsApp Assistant is running ✅");
 });
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });
