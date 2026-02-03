@@ -25,7 +25,7 @@ app.post('/incomingMessages', twilio.webhook({ validate: false, authToken: proce
     // Add the incoming message to context
     conversationContext.push({ role: "user", content: incomingMsg });
     // Ask the brain for a reply
-    const replyMessage = (await getAIReply(incomingMsg)).trim();
+     const replyMessage = "✅ Render webhook reached you";
 
     // Respond to the message
     res.send(`<Response><Message>${replyMessage}</Message></Response>`);
