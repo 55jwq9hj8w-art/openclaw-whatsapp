@@ -1,4 +1,5 @@
 const { getAIReply } = require("./brain/assistant");
+const { checkCommand } = require("./brain/commandRouter");
 require("dotenv").config();
 
 const express = require("express");
@@ -22,19 +23,24 @@ app.post(
     authToken: process.env.TWILIO_AUTH_TOKEN,
   }),
   async (req, res) => {
-    const incomingMsg = req.body.Body;
-    const fromNumber = req.body.From;
+    const incomingMsg = req.body.Body || "";
+    const fromNumber = req.body.From || "";
 
     console.log(`Message from ${fromNumber}: ${incomingMsg}`);
 
     let replyMessage;
     try {
-     replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
-
+      // 1) Check for simple commands first (like "help")
+      const commandReply = checkCommand(incomingMsg);
+      if (commandReply) {
+        replyMessage = commandReply.trim();
+      } else {
+        // 2) Otherwise use the AI (with memory)
+        replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
+      }
     } catch (err) {
-      console.error("OpenAI error:", err?.message || err);
-      replyMessage =
-        "⚠️ I hit an error talking to the AI. Try again in a moment.";
+      console.error("Error:", err?.message || err);
+      replyMessage = "⚠️ I hit an error. Try again in a moment.";
     }
 
     res.type("text/xml");
@@ -75,4 +81,3 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
-
