@@ -6,33 +6,23 @@ const twilio = require("twilio");
 
 const { getAIReply } = require("./brain/assistant");
 const { routeCommand } = require("./brain/commandRouter");
-const { ASSISTANT_NAME } = require("./brain/prompt");
 
 const app = express();
 
-// ✅ Middleware
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
 
-// ✅ Health check route
-app.get("/health", (req, res) => {
-  res.json({
-    ok: true,
-    assistantName: ASSISTANT_NAME,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ✅ WhatsApp webhook
 app.post("/incomingMessages", async (req, res) => {
   const incomingMsg = (req.body.Body || "").trim();
   const fromNumber = req.body.From;
 
   let replyMessage = "";
 
+  // ✅ Route command first
   const command = routeCommand(incomingMsg);
 
-  if (command === "QUOTE_MODE_START") {
+  if (command === "SHOW_FACTS") {
+    replyMessage = await getAIReply(fromNumber, "SHOW_FACTS");
+  } else if (command === "QUOTE_MODE_START") {
     replyMessage = await getAIReply(fromNumber, "QUOTE_MODE_START");
   } else if (command) {
     replyMessage = command;
@@ -46,7 +36,6 @@ app.post("/incomingMessages", async (req, res) => {
   res.type("text/xml").send(twiml.toString());
 });
 
-// ✅ Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
