@@ -25,14 +25,15 @@ app.post(
     try {
       const commandReply = checkCommand(incomingMsg);
 
-      // ✅ If it's our quote flow starter flag, hand it to the assistant logic
+      // ✅ DEBUG LOGS (temporary)
+      console.log("INCOMING:", JSON.stringify(incomingMsg));
+      console.log("COMMAND_REPLY:", JSON.stringify(commandReply));
+
       if (commandReply === "QUOTE_MODE_START") {
         replyMessage = (await getAIReply(fromNumber, "QUOTE_MODE_START")).trim();
       } else if (commandReply) {
-        // Normal commands like help/menu
         replyMessage = commandReply.trim();
       } else {
-        // Normal AI reply
         replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
       }
     } catch (err) {
