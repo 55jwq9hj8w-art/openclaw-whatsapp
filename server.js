@@ -11,6 +11,16 @@ app.use(express.urlencoded({ extended: false }));
 
 const port = process.env.PORT || 3000;
 
+// ✅ Prevent TwiML/XML from breaking on special characters
+function escapeXml(unsafe = "") {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 app.post(
   "/incomingMessages",
   twilio.webhook({
@@ -25,7 +35,7 @@ app.post(
     try {
       const commandReply = checkCommand(incomingMsg);
 
-      // ✅ DEBUG LOGS (temporary)
+      // ✅ DEBUG (temporary)
       console.log("INCOMING:", JSON.stringify(incomingMsg));
       console.log("COMMAND_REPLY:", JSON.stringify(commandReply));
 
@@ -36,13 +46,17 @@ app.post(
       } else {
         replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
       }
+
+      console.log("SENDING:", JSON.stringify(replyMessage));
     } catch (err) {
       console.error("Error:", err?.message || err);
       replyMessage = "⚠️ I hit an error. Try again in a moment.";
     }
 
+    const safeReply = escapeXml(replyMessage);
+
     res.type("text/xml");
-    res.send(`<Response><Message>${replyMessage}</Message></Response>`);
+    res.send(`<Response><Message>${safeReply}</Message></Response>`);
   }
 );
 
