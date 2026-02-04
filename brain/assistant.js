@@ -14,39 +14,50 @@ async function getAIReply(userId, userMessage) {
   await saveMessage(userId, "user", userMessage);
 
   // Load recent history
-  const history = await getRecentMessages(userId, 12);
+  const history = await getRecentMessages(userId, 15);
 
-  // ✅ QUOTE FLOW CHECK (more flexible)
+  // Get last assistant message
   const lastAssistant = history
     .filter((m) => m.role === "assistant")
-    .slice(-1)[0]?.content?.toLowerCase();
+    .slice(-1)[0]?.content;
 
-  // Step 1: After "quote" → user gives service → ask quantity
-  if (
-    lastAssistant &&
-    (lastAssistant.includes("quote request started") ||
-      lastAssistant.includes("what service") ||
-      lastAssistant.includes("reply with what you need"))
-  ) {
+  // ✅ STEP 0: Start Quote Mode
+  if (userMessage === "QUOTE_MODE_START") {
+    const reply = `✅ Quote Request Started
+
+What service would you like a quote for?
+Examples:
+• Security cameras
+• Access control
+• Monitoring`;
+
+    await saveMessage(userId, "assistant", reply);
+    return reply;
+  }
+
+  // ✅ STEP 1: Service → Ask Quantity
+  if (lastAssistant && lastAssistant.includes("What service would you like")) {
     const reply = `✅ Got it — ${userMessage}.
 
-How many units/items will you need? (Example: 4 cameras)`;
+How many units/items will you need?
+(Example: 4 cameras)`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // Step 2: After quantity → ask installation
-  if (lastAssistant && lastAssistant.includes("how many units")) {
+  // ✅ STEP 2: Quantity → Ask Installation
+  if (lastAssistant && lastAssistant.includes("How many units")) {
     const reply = `Perfect.
 
-Do you need professional installation as well? (Yes or No)`;
+Do you need professional installation as well?
+(Yes or No)`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // Step 3: After installation → finish quote
+  // ✅ STEP 3: Installation → Finish Quote
   if (lastAssistant && lastAssistant.includes("professional installation")) {
     const reply = `✅ Awesome — thank you.
 
@@ -58,7 +69,7 @@ Our team will follow up shortly with pricing and next steps.`;
     return reply;
   }
 
-  // Otherwise normal AI behavior
+  // Otherwise normal AI response
   const response = await client.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
@@ -67,10 +78,7 @@ Our team will follow up shortly with pricing and next steps.`;
   const reply = response.choices[0].message.content;
 
   await saveMessage(userId, "assistant", reply);
-
   return reply;
 }
 
 module.exports = { getAIReply };
-
-
