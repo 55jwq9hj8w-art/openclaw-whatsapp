@@ -9,16 +9,15 @@ const { getAIReply } = require("./brain/assistant");
 const { routeCommand } = require("./brain/commandRouter");
 
 const app = express();
-
 app.use(express.urlencoded({ extended: false }));
 
-// --- DB (for admin message viewer) ---
+// ---------- DATABASE ----------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// --- Helpers ---
+// ---------- HELPERS ----------
 function escapeHtml(str = "") {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -28,28 +27,42 @@ function escapeHtml(str = "") {
     .replaceAll("'", "&#039;");
 }
 
-// --- Health check (helps confirm deployments) ---
+function normalizeToken(v) {
+  if (v == null) return "";
+  let s = String(v).trim();
+
+  // strip surrounding quotes if Render added them
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
+// ---------- HEALTH CHECK ----------
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Admin: View last 50 messages (optionally filtered by user_id) ---
+// ---------- ADMIN: VIEW MESSAGES ----------
 app.get("/messages", async (req, res) => {
   try {
-    const adminToken = process.env.ADMIN_TOKEN;
-    const token = req.query.token;
+    const adminToken = normalizeToken(process.env.ADMIN_TOKEN);
+    const token = normalizeToken(req.query.token);
 
     if (!adminToken) {
       return res
         .status(500)
-        .send("ADMIN_TOKEN is not set on the server environment.");
+        .send("ADMIN_TOKEN is not set on the server.");
     }
 
     if (!token || token !== adminToken) {
       return res.status(401).send("Unauthorized");
     }
 
-    const userId = req.query.user_id ? String(req.query.user_id) : null;
+    const userId = req.query.user_id || null;
 
     const { rows } = await pool.query(
       `
@@ -62,7 +75,9 @@ app.get("/messages", async (req, res) => {
       [userId]
     );
 
-    const title = userId ? `Messages for ${userId}` : "Latest Messages (Last 50)";
+    const title = userId
+      ? `Messages for ${userId}`
+      : "Latest Messages (Last 50)";
 
     const html = `<!doctype html>
 <html>
@@ -73,36 +88,24 @@ app.get("/messages", async (req, res) => {
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
     .wrap { max-width: 1000px; margin: 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 12px; }
-    .meta { color: #555; font-size: 13px; margin-bottom: 12px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: top; }
     th { text-align: left; font-size: 13px; color: #333; }
     td { font-size: 14px; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #f2f2f2; }
+    .pill { padding: 2px 8px; border-radius: 999px; background: #f2f2f2; font-size: 12px; }
     .content { white-space: pre-wrap; word-break: break-word; }
-    .topbar { display:flex; gap:12px; align-items:center; margin-bottom:12px; }
-    .topbar a { font-size: 13px; }
-    input { padding: 8px; width: 360px; max-width: 100%; }
-    button { padding: 8px 10px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <h1>${escapeHtml(title)}</h1>
-    </div>
-
-    <div class="meta">
-      Tip: filter by user_id like <code>&amp;user_id=whatsapp:+15551234567</code>
-    </div>
-
+    <h1>${escapeHtml(title)}</h1>
     <table>
       <thead>
         <tr>
-          <th style="width: 220px;">Time</th>
-          <th style="width: 220px;">User</th>
-          <th style="width: 120px;">Role</th>
+          <th>Time</th>
+          <th>User</th>
+          <th>Role</th>
           <th>Content</th>
         </tr>
       </thead>
@@ -112,12 +115,12 @@ app.get("/messages", async (req, res) => {
             ? rows
                 .map(
                   (r) => `
-          <tr>
-            <td>${escapeHtml(new Date(r.created_at).toISOString())}</td>
-            <td>${escapeHtml(r.user_id)}</td>
-            <td><span class="pill">${escapeHtml(r.role)}</span></td>
-            <td class="content">${escapeHtml(r.content)}</td>
-          </tr>`
+        <tr>
+          <td>${escapeHtml(new Date(r.created_at).toISOString())}</td>
+          <td>${escapeHtml(r.user_id)}</td>
+          <td><span class="pill">${escapeHtml(r.role)}</span></td>
+          <td class="content">${escapeHtml(r.content)}</td>
+        </tr>`
                 )
                 .join("")
             : `<tr><td colspan="4">No messages found.</td></tr>`
@@ -135,18 +138,16 @@ app.get("/messages", async (req, res) => {
   }
 });
 
-// --- Twilio webhook ---
+// ---------- TWILIO WEBHOOK ----------
 app.post("/incomingMessages", async (req, res) => {
   const incomingMsg = (req.body.Body || "").trim();
   const fromNumber = req.body.From;
 
   let replyMessage = "";
 
-  // ✅ Command routing
   const command = routeCommand(incomingMsg);
 
   if (command === "SHOW_FACTS") {
-    // ✅ Run facts command
     replyMessage = await getAIReply(fromNumber, "SHOW_FACTS");
   } else if (command === "QUOTE_MODE_START") {
     replyMessage = await getAIReply(fromNumber, "QUOTE_MODE_START");
@@ -162,5 +163,8 @@ app.post("/incomingMessages", async (req, res) => {
   res.type("text/xml").send(twiml.toString());
 });
 
+// ---------- START SERVER ----------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
