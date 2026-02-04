@@ -1,25 +1,17 @@
 // brain/commandRouter.js
 
-function normalize(text = "") {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ");
-}
+const { ASSISTANT_NAME } = require("./prompt");
 
-function checkCommand(message) {
-  const text = normalize(message);
+function routeCommand(message) {
+  const text = (message || "").trim().toLowerCase();
 
   if (text === "help" || text === "menu") {
-    return `
-✅ OpenClaw Assistant Help Menu
+    return `✅ ${ASSISTANT_NAME} Help Menu
 
-• quote     → request a project quote
-• schedule  → schedule a call or install
-• support   → get help with an issue
-• menu      → show this menu again
-    `;
+Try:
+• help
+• menu
+• quote`;
   }
 
   if (text === "quote") {
@@ -29,5 +21,4 @@ function checkCommand(message) {
   return null;
 }
 
-module.exports = { checkCommand };
-
+module.exports = { routeCommand };

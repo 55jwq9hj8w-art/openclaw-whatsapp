@@ -3,13 +3,19 @@ require("dotenv").config();
 
 const OpenAI = require("openai");
 const { saveMessage, getRecentMessages } = require("./memory");
-const { SYSTEM_PROMPT } = require("./prompt");
+const { SYSTEM_PROMPT, ASSISTANT_NAME } = require("./prompt");
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 async function getAIReply(userId, userMessage) {
+  // ✅ Hard override for name question
+  const clean = (userMessage || "").toLowerCase();
+  if (clean.includes("your name")) {
+    return `I'm ${ASSISTANT_NAME}.`;
+  }
+
   // Save user message
   await saveMessage(userId, "user", userMessage);
 
@@ -21,64 +27,52 @@ async function getAIReply(userId, userMessage) {
     .filter((m) => m.role === "assistant")
     .slice(-1)[0]?.content;
 
-  // ✅ STEP 0: Start Quote Mode
+  // Quote flow
   if (userMessage === "QUOTE_MODE_START") {
     const reply = `✅ Quote Request Started
 
-What service would you like a quote for?
-Examples:
-• Security cameras
-• Access control
-• Monitoring`;
+What service would you like a quote for?`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // ✅ STEP 1: Service → Ask Quantity
-  if (lastAssistant && lastAssistant.includes("What service would you like")) {
+  if (lastAssistant && lastAssistant.includes("What service")) {
     const reply = `✅ Got it — ${userMessage}.
 
-How many units/items will you need?
-(Example: 4 cameras)`;
+How many units/items will you need?`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // ✅ STEP 2: Quantity → Ask Installation
   if (lastAssistant && lastAssistant.includes("How many units")) {
-    const reply = `Perfect.
-
-Do you need professional installation as well?
-(Yes or No)`;
+    const reply = `Do you need professional installation as well? (Yes or No)`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // ✅ STEP 3: Installation → Finish Quote
   if (lastAssistant && lastAssistant.includes("professional installation")) {
-    const reply = `✅ Awesome — thank you.
+    const reply = `✅ Thank you.
 
-Your quote request is complete.
-
-Our team will follow up shortly with pricing and next steps.`;
+Your quote request is complete.`;
 
     await saveMessage(userId, "assistant", reply);
     return reply;
   }
 
-  // Otherwise normal AI response
+  // Normal AI Response
   const response = await client.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
   });
 
-  const reply = response.choices[0].message.content;
+  const replyMessage = response.choices[0].message.content;
 
-  await saveMessage(userId, "assistant", reply);
-  return reply;
+  await saveMessage(userId, "assistant", replyMessage);
+
+  return replyMessage;
 }
 
 module.exports = { getAIReply };
