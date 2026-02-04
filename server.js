@@ -11,9 +11,6 @@ app.use(express.urlencoded({ extended: false }));
 
 const port = process.env.PORT || 3000;
 
-//
-// ✅ MAIN WHATSAPP ROUTE
-//
 app.post(
   "/incomingMessages",
   twilio.webhook({
@@ -26,16 +23,16 @@ app.post(
     let replyMessage = "";
 
     try {
-      // ✅ Check commands first
       const commandReply = checkCommand(incomingMsg);
 
-      if (commandReply) {
+      // ✅ If it's our quote flow starter flag, hand it to the assistant logic
+      if (commandReply === "QUOTE_MODE_START") {
+        replyMessage = (await getAIReply(fromNumber, "QUOTE_MODE_START")).trim();
+      } else if (commandReply) {
+        // Normal commands like help/menu
         replyMessage = commandReply.trim();
       } else {
-        // ✅ DEBUG: log what user sent
-        console.log("LAST MESSAGE:", incomingMsg);
-
-        // Otherwise use AI reply
+        // Normal AI reply
         replyMessage = (await getAIReply(fromNumber, incomingMsg)).trim();
       }
     } catch (err) {
@@ -48,17 +45,10 @@ app.post(
   }
 );
 
-//
-// Root endpoint
-//
 app.get("/", (req, res) => {
   res.send("OpenClaw WhatsApp Assistant is running ✅");
 });
 
-//
-// Start server
-//
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
-
