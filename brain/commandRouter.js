@@ -11,11 +11,17 @@ function routeCommand(message) {
 Try:
 • help
 • menu
-• quote`;
+• quote
+• facts`;
   }
 
   if (text === "quote") {
     return "QUOTE_MODE_START";
+  }
+
+  // ✅ New Admin/User command
+  if (text === "facts") {
+    return "SHOW_FACTS";
   }
 
   return null;

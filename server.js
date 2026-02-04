@@ -17,10 +17,11 @@ app.post("/incomingMessages", async (req, res) => {
 
   let replyMessage = "";
 
-  // ✅ Route command first
+  // ✅ Command routing
   const command = routeCommand(incomingMsg);
 
   if (command === "SHOW_FACTS") {
+    // ✅ Run facts command
     replyMessage = await getAIReply(fromNumber, "SHOW_FACTS");
   } else if (command === "QUOTE_MODE_START") {
     replyMessage = await getAIReply(fromNumber, "QUOTE_MODE_START");
@@ -37,6 +38,4 @@ app.post("/incomingMessages", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
