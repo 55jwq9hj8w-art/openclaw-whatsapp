@@ -4,13 +4,17 @@ require("dotenv").config();
 const express = require("express");
 const twilio = require("twilio");
 const { Pool } = require("pg");
+const multer = require("multer");
 
 const { getAIReply } = require("./brain/assistant");
 const { routeCommand } = require("./brain/commandRouter");
-const { listFilesForUser } = require("./brain/files");
+const { listFilesForUser, saveFile } = require("./brain/files");
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
+
+// Multer (in-memory uploads for now)
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ---------- DATABASE ----------
 const pool = new Pool({
@@ -65,55 +69,6 @@ app.get("/health", (req, res) => {
 });
 
 // ---------- ADMIN DASHBOARD UI ----------
-// ---------- ADMIN: FILE UPLOAD PAGE (UI ONLY) ----------
-app.get("/admin/upload", async (req, res) => {
-  try {
-    if (!requireAdmin(req, res)) return;
-
-    const token = normalizeToken(req.query.token);
-
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Upload File</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
-    .wrap { max-width: 700px; margin: 0 auto; }
-    h1 { font-size: 18px; margin-bottom: 12px; }
-    label { display:block; font-size: 13px; color:#333; margin-top: 12px; }
-    input { width:100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; margin-top: 6px; }
-    button { margin-top: 14px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; background: #fff; cursor: pointer; }
-    button:hover { background:#f6f6f6; }
-    .hint { color:#666; font-size: 12px; margin-top: 8px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Admin Upload</h1>
-
-    <form method="POST" action="/admin/upload?token=${encodeURIComponent(token)}" enctype="multipart/form-data">
-      <label>User ID (example: whatsapp:+1386...)</label>
-      <input name="user_id" placeholder="whatsapp:+1..." required />
-
-      <label>File</label>
-      <input type="file" name="file" required />
-
-      <button type="submit">Upload</button>
-      <div class="hint">Next step will wire actual storage + saving to user_files.</div>
-    </form>
-  </div>
-</body>
-</html>`;
-
-    res.type("text/html").send(html);
-  } catch (err) {
-    console.error("Error in /admin/upload:", err);
-    res.status(500).send("Server error");
-  }
-});
-
 app.get("/admin", async (req, res) => {
   try {
     if (!requireAdmin(req, res)) return;
@@ -153,12 +108,16 @@ app.get("/admin", async (req, res) => {
     input[type="text"] { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; width: 240px; }
     button { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; }
     button:hover { background: #f6f6f6; }
+    a { color: inherit; }
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="brand">OpenClaw Admin</div>
     <div class="small">Dashboard UI (users + chat, auto-refresh)</div>
+    <div class="small">
+      <a href="/admin/upload?token=${encodeURIComponent(token)}">Upload file</a>
+    </div>
     <div style="flex:1"></div>
     <div class="row">
       <input id="filter" type="text" placeholder="Filter user_id..." />
@@ -352,7 +311,6 @@ app.get("/admin", async (req, res) => {
     try {
       await loadUsers();
 
-      // optional: support direct link /admin?token=...&user_id=...
       const initialUser = qs("user_id");
       if (initialUser) {
         await selectUser(initialUser);
@@ -370,6 +328,87 @@ app.get("/admin", async (req, res) => {
     res.type("text/html").send(html);
   } catch (err) {
     console.error("Error in /admin:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+// ---------- ADMIN: FILE UPLOAD PAGE ----------
+app.get("/admin/upload", async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const token = normalizeToken(req.query.token);
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload File</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+    .wrap { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 12px; }
+    label { display:block; font-size: 13px; color:#333; margin-top: 12px; }
+    input { width:100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; margin-top: 6px; }
+    button { margin-top: 14px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; background: #fff; cursor: pointer; }
+    button:hover { background:#f6f6f6; }
+    .hint { color:#666; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Admin Upload</h1>
+
+    <form method="POST" action="/admin/upload?token=${encodeURIComponent(
+      token
+    )}" enctype="multipart/form-data">
+      <label>User ID (example: whatsapp:+1386...)</label>
+      <input name="user_id" placeholder="whatsapp:+1..." required />
+
+      <label>File</label>
+      <input type="file" name="file" required />
+
+      <button type="submit">Upload</button>
+      <div class="hint">This stores file metadata in Postgres. Next step is cloud file storage + text extraction.</div>
+    </form>
+  </div>
+</body>
+</html>`;
+
+    res.type("text/html").send(html);
+  } catch (err) {
+    console.error("Error in /admin/upload:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+// ---------- ADMIN: HANDLE FILE UPLOAD ----------
+app.post("/admin/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const userId = req.body.user_id;
+    const file = req.file;
+
+    if (!userId || !file) {
+      return res.status(400).send("Missing user_id or file");
+    }
+
+    // For now: we store metadata only. Next step is real file storage + text extraction.
+    const extractedText = "";
+
+    await saveFile({
+      user_id: userId,
+      file_name: file.originalname,
+      file_type: file.mimetype,
+      file_url: "",
+      extracted_text: extractedText,
+    });
+
+    res.send(`Saved file: ${file.originalname} for user ${userId}.`);
+  } catch (err) {
+    console.error("Upload error:", err);
     res.status(500).send("Server error");
   }
 });
@@ -421,6 +460,7 @@ app.get("/admin/api/messages", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 // ---------- ADMIN API: FILES FOR USER ----------
 app.get("/admin/api/files", async (req, res) => {
   try {
@@ -457,9 +497,7 @@ app.get("/messages", async (req, res) => {
       [userId]
     );
 
-    const title = userId
-      ? `Messages for ${userId}`
-      : "Latest Messages (Last 50)";
+    const title = userId ? `Messages for ${userId}` : "Latest Messages (Last 50)";
 
     const html = `<!doctype html>
 <html>
