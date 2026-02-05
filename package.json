@@ -12,6 +12,7 @@
     "twilio": "^5.12.0"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "./start.sh"
   }
 }
+

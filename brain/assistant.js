@@ -1,13 +1,19 @@
 // brain/assistant.js
 require("dotenv").config();
 
-const OpenAI = require("openai");
+const axios = require("axios");
 const { saveMessage, getRecentMessages, saveFact, getFacts } = require("./memory");
 const { SYSTEM_PROMPT, ASSISTANT_NAME } = require("./prompt");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ----- OpenClaw Gateway -----
+const OPENCLAW_GATEWAY_WS = process.env.OPENCLAW_GATEWAY_WS; // e.g. ws://100.66.119.56:18789
+const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
+
+function requireEnv(name, value) {
+  if (!value) {
+    throw new Error(`${name} is not set`);
+  }
+}
 
 // ✅ Extract simple facts
 function extractFact(message) {
@@ -30,6 +36,53 @@ function extractFact(message) {
   }
 
   return null;
+}
+
+/**
+ * Call OpenClaw agent via Gateway RPC (HTTP bridge).
+ * OpenClaw Gateway is a WebSocket server, but exposes an HTTP-compatible call endpoint
+ * via the local dashboard origin. We use the same host/port and hit /rpc.
+ *
+ * If your build differs, we'll adjust after seeing the error output.
+ */
+async function callOpenClawAgent({ userId, message }) {
+  requireEnv("OPENCLAW_GATEWAY_WS", OPENCLAW_GATEWAY_WS);
+  requireEnv("OPENCLAW_GATEWAY_TOKEN", OPENCLAW_GATEWAY_TOKEN);
+
+  // Convert ws://host:port -> http://host:port
+  const httpBase = OPENCLAW_GATEWAY_WS.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+  const url = `${httpBase}/rpc`;
+
+  // Minimal, stable payload: ask the default agent to respond and return text
+  const payload = {
+    method: "agent.turn",
+    params: {
+      to: userId,
+      message,
+      deliver: false
+    },
+    auth: {
+      token: OPENCLAW_GATEWAY_TOKEN
+    }
+  };
+
+  const res = await axios.post(url, payload, {
+    timeout: 60000,
+    headers: { "Content-Type": "application/json" }
+  });
+
+  // Try common response shapes
+  const data = res.data || {};
+  const text =
+    data?.result?.message ||
+    data?.result?.text ||
+    data?.message ||
+    data?.text;
+
+  if (!text) {
+    return "I ran into an issue talking to James (no reply text returned).";
+  }
+  return String(text);
 }
 
 async function getAIReply(userId, userMessage) {
@@ -81,16 +134,21 @@ async function getAIReply(userId, userMessage) {
 
   const FACTS_CONTEXT = factLines ? `\n\nUser Facts:\n${factLines}\n` : "";
 
-  // ✅ Load recent history
+  // ✅ Load recent history (kept for your dashboard)
   const history = await getRecentMessages(userId, 15);
 
-  // ✅ OpenAI response
-  const response = await client.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "system", content: SYSTEM_PROMPT + FACTS_CONTEXT }, ...history],
-  });
+  // Build a single prompt for James
+  const historyText = (history || [])
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n");
 
-  const replyMessage = response.choices[0].message.content;
+  const composed = `${SYSTEM_PROMPT}${FACTS_CONTEXT}\n\nConversation so far:\n${historyText}\n\nUser: ${userMessage}`;
+
+  // ✅ OpenClaw (James) response
+  const replyMessage = await callOpenClawAgent({
+    userId,
+    message: composed
+  });
 
   await saveMessage(userId, "assistant", replyMessage);
 
