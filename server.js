@@ -7,6 +7,7 @@ const { Pool } = require("pg");
 
 const { getAIReply } = require("./brain/assistant");
 const { routeCommand } = require("./brain/commandRouter");
+const { listFilesForUser } = require("./brain/files");
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
@@ -368,6 +369,23 @@ app.get("/admin/api/messages", async (req, res) => {
     res.json({ messages: rows });
   } catch (err) {
     console.error("Error in /admin/api/messages:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+// ---------- ADMIN API: FILES FOR USER ----------
+app.get("/admin/api/files", async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const userId = req.query.user_id;
+    if (!userId) {
+      return res.status(400).json({ error: "user_id is required" });
+    }
+
+    const files = await listFilesForUser(userId);
+    res.json({ files });
+  } catch (err) {
+    console.error("Error in /admin/api/files:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
