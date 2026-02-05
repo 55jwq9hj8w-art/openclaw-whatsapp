@@ -65,6 +65,55 @@ app.get("/health", (req, res) => {
 });
 
 // ---------- ADMIN DASHBOARD UI ----------
+// ---------- ADMIN: FILE UPLOAD PAGE (UI ONLY) ----------
+app.get("/admin/upload", async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const token = normalizeToken(req.query.token);
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload File</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+    .wrap { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 12px; }
+    label { display:block; font-size: 13px; color:#333; margin-top: 12px; }
+    input { width:100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; margin-top: 6px; }
+    button { margin-top: 14px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; background: #fff; cursor: pointer; }
+    button:hover { background:#f6f6f6; }
+    .hint { color:#666; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Admin Upload</h1>
+
+    <form method="POST" action="/admin/upload?token=${encodeURIComponent(token)}" enctype="multipart/form-data">
+      <label>User ID (example: whatsapp:+1386...)</label>
+      <input name="user_id" placeholder="whatsapp:+1..." required />
+
+      <label>File</label>
+      <input type="file" name="file" required />
+
+      <button type="submit">Upload</button>
+      <div class="hint">Next step will wire actual storage + saving to user_files.</div>
+    </form>
+  </div>
+</body>
+</html>`;
+
+    res.type("text/html").send(html);
+  } catch (err) {
+    console.error("Error in /admin/upload:", err);
+    res.status(500).send("Server error");
+  }
+});
+
 app.get("/admin", async (req, res) => {
   try {
     if (!requireAdmin(req, res)) return;
